@@ -508,3 +508,75 @@ INSTANTIATE_TEST_CASE_P(Batch, FilterGenericTest, ::testing::Values(
                             InputOutputPair{"'some string' | batch(0) | pprint", "none"},
                             InputOutputPair{"[] | batch(0) | pprint", "none"}
                             ));
+
+INSTANTIATE_TEST_CASE_P(ToJson, FilterGenericTest, ::testing::Values(
+                            InputOutputPair{"(1, 2, 3) | tojson", "[1,2,3]"},
+                            InputOutputPair{"(1, 2, 3) | tojson(indent = 1)", "[1, 2, 3]"},
+                            InputOutputPair{"'\"ba&r\\'' | tojson", "\"\\\"ba\\u0026r\\u0027\""},
+                            InputOutputPair{"'<bar>' | tojson", "\"\\u003cbar\\u003e\""}
+                            ));
+
+struct ToJson : SubstitutionTestBase
+{
+    ValuesMap getObjectParam() const
+    {
+        const ValuesMap object {
+            {"intValue", 3},
+            {"doubleValue", 12.123f},
+            {"stringValue", "rain"},
+            {"wstringValue", std::wstring(L"rain")},
+            {"boolFalseValue", false},
+            {"boolTrueValue", true},
+            {"listValue", ValuesList {1, 2, 3}},
+            {"map", ValuesMap {{"str1", 1}}}
+        };
+
+        return ValuesMap {{"obj", object}};
+    }
+
+    ValuesMap getKeyValuePairParam() const
+    {
+        const ValuesMap pair {{"foo", "bar"}};
+        return ValuesMap {{"obj", pair}};
+    }
+};
+
+TEST_F(ToJson, SerializeKeyValuePair)
+{
+    static constexpr auto source = "{{obj | tojson}}";
+
+    const ValuesMap pair = {{"foo", "bar"}};
+    const ValuesMap params = {{"obj", pair}};
+
+    const auto expectedResult = "{\"foo\":\"bar\"}";
+
+    PerformBothTests(source, expectedResult, getKeyValuePairParam());
+}
+
+TEST_F(ToJson, SerializeObject)
+{
+    const auto source = "{{obj | tojson}}";
+    const auto expectedResult = "{\"map\":{\"str1\":1},\"listValue\":[1,2,3],\"boolFalseValue\":false,\"boolTrueValue\":true,\"wstringValue\":\"rain\",\"stringValue\":\"rain\",\"doubleValue\":12.123000144958496,\"intValue\":3}";
+
+    PerformBothTests(source, expectedResult, getObjectParam());
+}
+
+TEST_F(ToJson, SerializeObjectWithIndent)
+{
+    const auto source = "{{obj | tojson(indent=4)}}";
+    const auto expectedResult =
+R"({
+    "map": {
+        "str1": 1
+    },
+    "listValue": [1, 2, 3],
+    "boolFalseValue": false,
+    "boolTrueValue": true,
+    "wstringValue": "rain",
+    "stringValue": "rain",
+    "doubleValue": 12.123000144958496,
+    "intValue": 3
+})";
+
+    PerformBothTests(source, expectedResult, getObjectParam());
+}
